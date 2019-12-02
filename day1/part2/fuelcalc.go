@@ -33,7 +33,7 @@ func main() {
 
 func calculateFuel(i int) int {
 	f := i/3 - 2
-	if f/3 - 2 > 0 {
+	if f/3-2 > 0 {
 		f += calculateFuel(f)
 	}
 	return f
