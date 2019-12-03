@@ -37,14 +37,8 @@ func main() {
 
 	ints := extractIntArr(file)
 	var sum int
-	c := make(chan int)
 	for _, i := range ints {
-		go func(i int) {
-			c <- calculateFuelRecursive(i)
-		}(i)
-	}
-	for range c {
-		sum += <-c
+		sum += calculateFuelRecursive(i)
 	}
 	log.Printf("sum %d", sum)
 }
@@ -54,9 +48,8 @@ func calculateFuel(i int) int {
 }
 
 func calculateFuelRecursive(i int) int {
-	time.Sleep(1000)
-	f := i/3 - 2
-	if f/3-2 > 0 {
+	f := calculateFuel(i)
+	if calculateFuel(f) > 0 {
 		f += calculateFuelRecursive(f)
 	}
 	return f
@@ -76,7 +69,7 @@ func extractIntArr(reader io.Reader) []int {
 	for scanner.Scan() {
 		i, err := strconv.Atoi(scanner.Text())
 		if err != nil {
-			log.Panic("Error while converting to int")
+			log.Panic(err)
 		}
 		ints = append(ints, i)
 	}
