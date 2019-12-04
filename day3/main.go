@@ -25,10 +25,11 @@ func main() {
 	defer file.Close()
 	mtx := extractStringMatrix(file)
 
-	p := wp.NewPanel(wp.Coordinates{0, 0})
+	p := wp.NewPanel()
 
 	for i, v := range mtx {
-		w := wp.NewWire(i+1, []wp.Coordinates{p.GetCentral()})
+		// Start Wire ID at 1 to avoid overlap with zero-value of lastVisited
+		w := wp.NewWire(i+1)
 		instructions := wp.ParseInstructions(v)
 		p.RouteWireFull(w, instructions)
 	}

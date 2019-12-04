@@ -17,12 +17,12 @@ type Panel struct {
 	central        Coordinates
 }
 
-func NewPanel(c Coordinates) *Panel {
+func NewPanel() *Panel {
 	return &Panel{
 		grid:           map[Coordinates]lastVisited{},
 		closestByDist:  math.MaxInt32,
 		closestBySteps: math.MaxInt32,
-		central:        c,
+		central:        Coordinates{},
 	}
 }
 
@@ -39,6 +39,7 @@ func (p *Panel) GetClosestBySteps() int {
 }
 
 func (p *Panel) RouteWireFull(w *Wire, insts []Instruction) {
+	w.AddStep(p.GetCentral())
 	for _, inst := range insts {
 		p.RouteWireSingle(w, inst)
 	}

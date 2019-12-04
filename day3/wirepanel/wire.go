@@ -5,10 +5,10 @@ type Wire struct {
 	steps []Coordinates
 }
 
-func NewWire(id int, steps []Coordinates) *Wire {
+func NewWire(id int) *Wire {
 	return &Wire{
 		id:    id,
-		steps: steps,
+		steps: []Coordinates{},
 	}
 }
 
