@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"math"
+	"time"
 )
 
 const (
@@ -11,6 +12,7 @@ const (
 )
 
 func main() {
+	defer timeTrack(time.Now(), "main")
 	p := &PasswordSolver{
 		floor:   floor,
 		ceiling: ceiling,
@@ -27,30 +29,6 @@ type PasswordSolver struct {
 	ceiling            int
 	possiblePasswords  []int
 	possiblePasswords2 []int
-}
-
-func (p *PasswordSolver) AddPossiblePassword(i int) {
-	p.possiblePasswords = append(p.possiblePasswords, i)
-}
-
-func (p *PasswordSolver) GetNumPossiblePasswords() int {
-	return len(p.possiblePasswords)
-}
-
-func (p *PasswordSolver) GetPossiblePasswords() []int {
-	return p.possiblePasswords
-}
-
-func (p *PasswordSolver) AddPossiblePassword2(i int) {
-	p.possiblePasswords2 = append(p.possiblePasswords2, i)
-}
-
-func (p *PasswordSolver) GetNumPossiblePasswords2() int {
-	return len(p.possiblePasswords2)
-}
-
-func (p *PasswordSolver) GetPossiblePasswords2() []int {
-	return p.possiblePasswords2
 }
 
 func (p *PasswordSolver) FindPasswords() {
@@ -86,19 +64,49 @@ func (p *PasswordSolver) scanInt(i int) int {
 		}
 	}
 	result := arrToInt(arr)
-	if hasAdjacentSame && result <= p.ceiling {
+	if result > p.ceiling {
+		return result
+	}
+
+	if hasAdjacentSame {
 		p.AddPossiblePassword(result)
 	}
+
 	var hasUniquePair bool
 	for _, v := range adjMap {
 		if v == 2 {
 			hasUniquePair = true
 		}
 	}
-	if hasUniquePair && result <= p.ceiling {
+
+	if hasUniquePair {
 		p.AddPossiblePassword2(result)
 	}
 	return result
+}
+
+func (p *PasswordSolver) AddPossiblePassword(i int) {
+	p.possiblePasswords = append(p.possiblePasswords, i)
+}
+
+func (p *PasswordSolver) GetNumPossiblePasswords() int {
+	return len(p.possiblePasswords)
+}
+
+func (p *PasswordSolver) GetPossiblePasswords() []int {
+	return p.possiblePasswords
+}
+
+func (p *PasswordSolver) AddPossiblePassword2(i int) {
+	p.possiblePasswords2 = append(p.possiblePasswords2, i)
+}
+
+func (p *PasswordSolver) GetNumPossiblePasswords2() int {
+	return len(p.possiblePasswords2)
+}
+
+func (p *PasswordSolver) GetPossiblePasswords2() []int {
+	return p.possiblePasswords2
 }
 
 // Returns number of overwritten elements
@@ -135,4 +143,9 @@ func arrToInt(arr []int) int {
 		result += v * int(math.Pow10(index))
 	}
 	return result
+}
+
+func timeTrack(start time.Time, name string) {
+	elapsed := time.Since(start)
+	log.Printf("%s took %s", name, elapsed)
 }
