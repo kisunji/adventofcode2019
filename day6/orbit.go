@@ -19,15 +19,20 @@ func main() {
 	//file := loadFile(test2)
 	strs := extractStrArr(file)
 
+	// Use map to track unidirectional adjacency
+	// Allows us to trace path to root from ends of the tree
+	// Key ORBITS value (e.g. A)B -> m[b] = a)
+	type orbitMap map[string]string
 	m := orbitMap{}
-
-	var orbits int
 
 	for _, s := range strs {
 		inputs := strings.Split(s, ")")
 		m[inputs[1]] = inputs[0]
 	}
 
+	var orbits int
+
+	// Range through all adjacencies, incrementing orbits until root is reached
 	for _, v := range m {
 		orbits++
 		centre, exists := m[v]
@@ -38,7 +43,7 @@ func main() {
 	}
 
 	log.Printf("orbits :%d", orbits)
-
+	// Trace path from "YOU" to root
 	youCentre, exists := m["YOU"]
 	centre := youCentre
 	youToCom := []string{}
@@ -46,6 +51,7 @@ func main() {
 		youToCom = append(youToCom, centre)
 		centre, exists = m[centre]
 	}
+	// Trace path from "SAN" to root
 	sanCentre, exists := m["SAN"]
 	centre = sanCentre
 	sanToCom := []string{}
@@ -57,6 +63,9 @@ func main() {
 	log.Printf("YOU->COM: %v", youToCom)
 	log.Printf("SAN->COM: %v", sanToCom)
 
+	// Starting from root (COM), increment the two arrays
+	// until a branching is detected. Count the leftover
+	// orbits in each list
 	var maxLength int
 	if len(sanToCom) > len(youToCom) {
 		maxLength = len(sanToCom)
@@ -74,10 +83,7 @@ func main() {
 			return
 		}
 	}
-
 }
-
-type orbitMap map[string]string
 
 func loadFile(input string) *os.File {
 	file, err := os.Open(input)
