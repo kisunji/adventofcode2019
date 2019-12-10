@@ -29,7 +29,7 @@ func main() {
 
 	for i, v := range mtx {
 		// Start Wire ID at 1 to avoid overlap with zero-value of lastVisited
-		w := wp.NewWire(i+1)
+		w := wp.NewWire(i + 1)
 		instructions := wp.ParseInstructions(v)
 		p.RouteWireFull(w, instructions)
 	}
@@ -60,6 +60,7 @@ func extractStringMatrix(reader io.Reader) [][]string {
 	}
 	return m
 }
+
 func timeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
 	log.Printf("%s took %s", name, elapsed)
