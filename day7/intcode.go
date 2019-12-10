@@ -2,12 +2,12 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,82 +21,101 @@ func main() {
 	defer file.Close()
 	ints := extractIntArr(file)
 
-	phases := []int{0, 1, 2, 3, 4}
+	phases := []int{5, 6, 7, 8, 9}
+
 	permutations := [][]int{}
+
 	for p := make([]int, len(phases)); p[0] < len(p); nextPerm(p) {
 		permutations = append(permutations, getPerm(phases, p))
 	}
-
 	var highestSignal int
 
 	for _, perm := range permutations {
 		log.Printf("Permutation: %v", perm)
 
-		inputChan := make(chan int)
-		outputChan := make(chan int)
+		inputChanA := make(chan int, 1)
+		outputChanA := make(chan int, 1)
+		inputChanB := make(chan int, 1)
+		outputChanB := make(chan int, 1)
+		inputChanC := make(chan int, 1)
+		outputChanC := make(chan int, 1)
+		inputChanD := make(chan int, 1)
+		outputChanD := make(chan int, 1)
+		inputChanE := make(chan int, 1)
+		outputChanE := make(chan int, 1)
 
-		inputA := []int{perm[0], 0}
+		var wg sync.WaitGroup
+		wg.Add(5)
 		go func() {
-			outputChan <- compute(ints, inputChan)
+			for v := range outputChanE {
+				log.Println("E -> A")
+				if v > highestSignal {
+					highestSignal = v
+				}
+				inputChanA <- v
+			}
+			close(inputChanA)
+			wg.Done()
 		}()
-		for _, v := range inputA {
-			inputChan <- v
-		}
-		outputA := <-outputChan
-
-		inputB := []int{perm[1], outputA}
 		go func() {
-			outputChan <- compute(ints, inputChan)
+			for v := range outputChanA {
+				log.Println("A -> B")
+				inputChanB <- v
+			}
+			close(inputChanB)
+			wg.Done()
 		}()
-		for _, v := range inputB {
-			inputChan <- v
-		}
-		outputB := <-outputChan
-
-		inputC := []int{perm[2], outputB}
 		go func() {
-			outputChan <- compute(ints, inputChan)
+			for v := range outputChanB {
+				log.Println("B -> C")
+				inputChanC <- v
+			}
+			close(inputChanC)
+			wg.Done()
 		}()
-		for _, v := range inputC {
-			inputChan <- v
-		}
-		outputC := <-outputChan
-
-		inputD := []int{perm[3], outputC}
 		go func() {
-			outputChan <- compute(ints, inputChan)
+			for v := range outputChanC {
+				log.Println("C -> D")
+				inputChanD <- v
+			}
+			close(inputChanD)
+			wg.Done()
 		}()
-		for _, v := range inputD {
-			inputChan <- v
-		}
-		outputD := <-outputChan
-
-		inputE := []int{perm[4], outputD}
 		go func() {
-			outputChan <- compute(ints, inputChan)
+			for v := range outputChanD {
+				log.Println("D -> E")
+				inputChanE <- v
+			}
+			close(inputChanE)
+			wg.Done()
 		}()
-		for _, v := range inputE {
-			inputChan <- v
-		}
-		outputE := <-outputChan
 
-		log.Printf("output: %v", outputE)
-		if outputE > highestSignal {
-			highestSignal = outputE
-		}
+		go func() {
+			compute(ints, inputChanA, outputChanA, "A")
+		}()
+		go func() {
+			compute(ints, inputChanB, outputChanB, "B")
+		}()
+		go func() {
+			compute(ints, inputChanC, outputChanC, "C")
+		}()
+		go func() {
+			compute(ints, inputChanD, outputChanD, "D")
+		}()
+		go func() {
+			compute(ints, inputChanE, outputChanE, "E")
+		}()
+
+		inputChanA <- perm[0]
+		inputChanB <- perm[1]
+		inputChanC <- perm[2]
+		inputChanD <- perm[3]
+		inputChanE <- perm[4]
+		inputChanA <- 0
+
+		wg.Wait()
 	}
 	log.Printf("highestSignal: %d", highestSignal)
-}
-
-func stdin() {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Input: ")
-	text, _ := reader.ReadString('\n')
-	var err error
-	strconv.Atoi(strings.TrimSpace(text))
-	if err != nil {
-		log.Panic(err)
-	}
 }
 
 type instruction struct {
@@ -104,10 +123,11 @@ type instruction struct {
 	modes  []int
 }
 
-func compute(instructions []int, c chan int) int {
+func compute(instructions []int, in <-chan int, out chan<- int, name string) {
 	// Clone array
 	arr := append([]int{}, instructions...)
 	pos := 0
+
 	opParamMap := map[int]int{
 		1: 3,
 		2: 3,
@@ -118,9 +138,11 @@ func compute(instructions []int, c chan int) int {
 		7: 3,
 		8: 3,
 	}
+
 	current := parseInstruction(arr[pos], opParamMap)
-	var output int
+
 	for current.opcode != 99 {
+		log.Printf("%s at opcode %d", name, current.opcode)
 		switch current.opcode {
 		case 1:
 			addOp(arr, pos, current.modes)
@@ -129,11 +151,10 @@ func compute(instructions []int, c chan int) int {
 			multOp(arr, pos, current.modes)
 			pos += opParamMap[current.opcode] + 1
 		case 3:
-			inputOp(arr, pos, c)
+			inputOp(arr, pos, in, name)
 			pos += opParamMap[current.opcode] + 1
 		case 4:
-			output = outputOp(arr, pos, current.modes)
-			log.Printf("Output detected: %d", output)
+			outputOp(arr, pos, out, current.modes)
 			pos += opParamMap[current.opcode] + 1
 		case 5:
 			pos = jumpIfTrueOp(arr, pos, current.modes)
@@ -149,8 +170,11 @@ func compute(instructions []int, c chan int) int {
 			log.Fatalln("Unsupported opcode!")
 		}
 		current = parseInstruction(arr[pos], opParamMap)
+		log.Printf("%s next opcode: %d", name, current.opcode)
 	}
-	return output
+
+	log.Printf("%s exiting!", name)
+	close(out)
 }
 
 func parseInstruction(i int, m map[int]int) *instruction {
@@ -173,16 +197,19 @@ func parseModes(arr []int, numParams int) []int {
 func addOp(arr []int, index int, modes []int) {
 	var first int
 	var second int
+
 	if modes[0] == 0 {
 		first = arr[index+1]
 	} else {
 		first = index + 1
 	}
+
 	if modes[1] == 0 {
 		second = arr[index+2]
 	} else {
 		second = index + 2
 	}
+
 	target := arr[index+3]
 	arr[target] = arr[first] + arr[second]
 }
@@ -190,6 +217,7 @@ func addOp(arr []int, index int, modes []int) {
 func multOp(arr []int, index int, modes []int) {
 	var first int
 	var second int
+
 	if modes[0] == 0 {
 		first = arr[index+1]
 	} else {
@@ -204,15 +232,15 @@ func multOp(arr []int, index int, modes []int) {
 	arr[target] = arr[first] * arr[second]
 }
 
-func inputOp(arr []int, index int, c chan int) {
-	log.Println("Waiting for input")
+func inputOp(arr []int, index int, c <-chan int, name string) {
+	log.Println(name + " Waiting for input")
 	input := <-c
-	log.Printf("Got input: %d", input)
+	log.Printf("%s Got input: %d", name, input)
 	target := arr[index+1]
 	arr[target] = input
 }
 
-func outputOp(arr []int, index int, modes []int) int {
+func outputOp(arr []int, index int, c chan<- int, modes []int) {
 	target := arr[index+1]
 	var output int
 	if modes[0] == 0 {
@@ -220,7 +248,7 @@ func outputOp(arr []int, index int, modes []int) int {
 	} else {
 		output = target
 	}
-	return output
+	c <- output
 }
 
 func jumpIfTrueOp(arr []int, index int, modes []int) int {
@@ -239,7 +267,6 @@ func jumpIfTrueOp(arr []int, index int, modes []int) int {
 	if arr[first] != 0 {
 		return arr[target]
 	}
-
 	return index + 3
 }
 
@@ -259,7 +286,6 @@ func jumpIfFalseOp(arr []int, index int, modes []int) int {
 	if arr[first] == 0 {
 		return arr[target]
 	}
-
 	return index + 3
 }
 
