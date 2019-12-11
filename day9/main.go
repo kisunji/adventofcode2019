@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -21,19 +20,13 @@ func main() {
 	defer file.Close()
 	ints := extractInt64Arr(file)
 	arr := append([]int64{}, ints...)
-	paramMap := map[int]int{
-		1: 3,
-		2: 3,
-		3: 1,
-		4: 1,
-		5: 2,
-		6: 2,
-		7: 3,
-		8: 3,
-		9: 1,
-	}
-	computer := &intcodecomputer{arr, paramMap, 0, 0}
-	computer.computeInput()
+
+	computer := NewIntcodeComputer(arr)
+	in := make(chan int64, 0)
+	out := make(chan int64, 0)
+	go computer.compute(in, out)
+	go func() { in <- 0 }()
+	go func() { log.Println(<-out) }()
 }
 
 type instruction struct {
@@ -48,7 +41,22 @@ type intcodecomputer struct {
 	relativeBase int64
 }
 
-func (c *intcodecomputer) computeInput() {
+func NewIntcodeComputer(instructions []int64) *intcodecomputer {
+	paramMap := map[int]int{
+		1: 3,
+		2: 3,
+		3: 1,
+		4: 1,
+		5: 2,
+		6: 2,
+		7: 3,
+		8: 3,
+		9: 1,
+	}
+	return &intcodecomputer{instructions, paramMap, 0, 0}
+}
+
+func (c *intcodecomputer) compute(in <-chan int64, out chan<- int64) {
 	current := c.parseInstruction()
 	for current.opcode != 99 {
 		switch current.opcode {
@@ -57,9 +65,9 @@ func (c *intcodecomputer) computeInput() {
 		case 2:
 			c.multOp(current.modes)
 		case 3:
-			c.inputOp(current.modes)
+			c.inputOp(current.modes, in)
 		case 4:
-			c.outputOp(current.modes)
+			c.outputOp(current.modes, out)
 		case 5:
 			c.jumpIfTrueOp(current.modes)
 		case 6:
@@ -130,24 +138,19 @@ func (c *intcodecomputer) multOp(modes []int) {
 	c.position += 4
 }
 
-func (c *intcodecomputer) inputOp(modes []int) {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Input: ")
-	text, _ := reader.ReadString('\n')
-	val, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
-	if err != nil {
-		log.Panic(err)
-	}
+func (c *intcodecomputer) inputOp(modes []int, in <-chan int64) {
+	log.Println(" Waiting for input")
+	val := <-in
+	log.Printf("Got input: %d", val)
 	target := c.translateIndex(modes[0], 1)
 	c.set(target, val)
 
 	c.position += 2
 }
 
-func (c *intcodecomputer) outputOp(modes []int) {
+func (c *intcodecomputer) outputOp(modes []int, out chan<- int64) {
 	target := c.translateIndex(modes[0], 1)
-	output := c.get(target)
-	fmt.Printf("Output: %d\n", output)
+	out <- c.get(target)
 
 	c.position += 2
 }
