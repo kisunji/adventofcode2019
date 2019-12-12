@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"github.com/kisunji/adventofcode2019/day9/intcode"
+	"github.com/kisunji/adventofcode2019/9/intcode"
 	"io"
 	"log"
 	"os"

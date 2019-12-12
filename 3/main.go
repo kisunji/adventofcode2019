@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	wp "github.com/kisunji/adventofcode2019/day3/wirepanel"
+	wp "github.com/kisunji/adventofcode2019/3/wirepanel"
 )
 
 const (
