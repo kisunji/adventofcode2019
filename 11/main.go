@@ -31,26 +31,8 @@ func main() {
 	ints := extractInt64Arr(file)
 	arr := append([]int64{}, ints...)
 
-	computer := intcode.NewIntcodeComputer(arr)
-	inputChan := make(chan int64)
-	outputChan := make(chan int64)
-	var wg sync.WaitGroup
-	wg.Add(3)
-	go func() {
-		computer.Compute(inputChan, outputChan)
-		wg.Done()
-	}()
 	r := NewRobot()
-	// TODO: merge read and write to one function that coordinates
-	go func() {
-		r.Read(inputChan)
-	}()
-	go func() {
-		r.WriteMove(outputChan)
-		wg.Done()
-	}()
-	wg.Wait()
-	log.Println(len(r.path))
+	r.Run(arr)
 }
 
 type Robot struct {
@@ -64,36 +46,55 @@ type Robot struct {
 func NewRobot() *Robot {
 	origin := coords{0, 0}
 	m := map[coords]int{}
-	m[origin] = 0
+	m[origin] = 1
 	return &Robot{direction: UP, position: coords{0, 0}, path: m}
 }
 
-func (r *Robot) Read(output chan<- int64) {
-	r.mux.Lock()
-	log.Printf("Read pos (%v):%v", r.position, r.path[r.position])
-	output <- int64(r.path[r.position])
-	r.mux.Unlock()
-}
-
-func (r *Robot) WriteMove(input <-chan int64) {
+func (r *Robot) Run(arr []int64) {
+	computer := intcode.NewIntcodeComputer(arr)
+	inputChan := make(chan int64,1)
+	outputChan := make(chan int64,1)
+	done := make(chan bool)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		computer.Compute(inputChan, outputChan)
+		done <- true
+		wg.Done()
+	}()
 	const (
 		WRITE = 0
 		MOVE  = 1
 	)
-	for out := range input {
-		r.mux.Lock()
-		if r.mode == WRITE {
-			log.Printf("Writing to pos(%v): %v", r.position, out)
-			r.path[r.position] = int(out)
-			r.mode = MOVE
-		} else {
-			r.turn(int(out))
-			r.moveForward()
-			r.mode = WRITE
+	go func() {
+		select {
+		case <-done:
+			return
+		default:
+			for {
+				inputChan <- int64(r.read())
+				x := <-outputChan
+				log.Printf("Writing to pos(%v): %v", r.position, x)
+				r.path[r.position] = int(x)
+				r.mode = MOVE
+
+				r.turn(int(<-outputChan))
+				r.moveForward()
+				r.mode = WRITE
+			}
 		}
-		r.mux.Unlock()
-	}
-	log.Println("WriteMove done")
+		wg.Done()
+	}()
+	wg.Wait()
+	log.Printf("Total tiles painted: %v", len(r.path))
+}
+
+func (r *Robot) read() int {
+	r.mux.Lock()
+	val := r.path[r.position]
+	log.Printf("Read pos (%v):%v", r.position, r.path[r.position])
+	r.mux.Unlock()
+	return val
 }
 
 func (r *Robot) turn(command int) {
