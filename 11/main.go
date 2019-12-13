@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"github.com/kisunji/adventofcode2019/9/intcode"
 	"io"
 	"log"
 	"os"
@@ -9,13 +10,12 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/kisunji/adventofcode2019/9/intcode"
 )
 
 const (
 	input = "input.txt"
 )
+
 const (
 	UP    = "up"
 	DOWN  = "down"
@@ -25,12 +25,10 @@ const (
 
 func main() {
 	defer timeTrack(time.Now(), "main")
-
 	file := loadFile(input)
 	defer file.Close()
 	ints := extractInt64Arr(file)
 	arr := append([]int64{}, ints...)
-
 	r := NewRobot()
 	r.Run(arr)
 }
@@ -40,7 +38,6 @@ type Robot struct {
 	position  coords
 	path      map[coords]int
 	mux       sync.Mutex
-	mode      int
 }
 
 func NewRobot() *Robot {
@@ -52,8 +49,8 @@ func NewRobot() *Robot {
 
 func (r *Robot) Run(arr []int64) {
 	computer := intcode.NewIntcodeComputer(arr)
-	inputChan := make(chan int64,1)
-	outputChan := make(chan int64,1)
+	inputChan := make(chan int64, 1)
+	outputChan := make(chan int64, 1)
 	done := make(chan bool)
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -62,39 +59,66 @@ func (r *Robot) Run(arr []int64) {
 		done <- true
 		wg.Done()
 	}()
-	const (
-		WRITE = 0
-		MOVE  = 1
-	)
 	go func() {
-		select {
-		case <-done:
-			return
-		default:
-			for {
+		for {
+			select {
+			case <-done:
+				wg.Done()
+			default:
+				// Following instructions should be blocking to maintain order
+				// Robot sends read input to inputChan
 				inputChan <- int64(r.read())
-				x := <-outputChan
-				log.Printf("Writing to pos(%v): %v", r.position, x)
-				r.path[r.position] = int(x)
-				r.mode = MOVE
-
+				// First val from outputChan is the writeVal
+				r.write(int(<-outputChan))
+				// Second val from outputChan is the command to turn
 				r.turn(int(<-outputChan))
 				r.moveForward()
-				r.mode = WRITE
 			}
 		}
-		wg.Done()
 	}()
 	wg.Wait()
-	log.Printf("Total tiles painted: %v", len(r.path))
+	log.Printf("Total tiles painted: %v", len(r.path))   // Iterate through coords in the map, finding the boundaries
+	var minX, maxX, minY, maxY int
+	for key, _ := range r.path {
+		if key.x <= minX {
+			minX = key.x
+		} else if key.x >= maxX {
+			maxX = key.x
+		}
+		if key.y <= minY {
+			minY = key.y
+		} else if key.y >= maxY {
+			maxY = key.y
+		}
+	}
+	offsetX := 0 - minX
+	offsetY := 0 - minY
+	width := maxX - maxY + 1
+	height := maxY - minY + 1
+	grid := make([][]int, height)
+	for i := range grid {
+		grid[i] = make([]int, width)
+	}
+	for k, v := range r.path {
+		log.Println(k)
+		grid[k.y+offsetY][k.x+offsetX] = v
+	}
+	// Image is flipped vertically
+	reverse(grid)
+	for _, v := range grid {
+		log.Println(v)
+	}
 }
 
 func (r *Robot) read() int {
-	r.mux.Lock()
 	val := r.path[r.position]
 	log.Printf("Read pos (%v):%v", r.position, r.path[r.position])
-	r.mux.Unlock()
 	return val
+}
+
+func (r *Robot) write(writeVal int) {
+	log.Printf("Writing to pos(%v): %v", r.position, writeVal)
+	r.path[r.position] = writeVal
 }
 
 func (r *Robot) turn(command int) {
@@ -177,4 +201,10 @@ func extractInt64Arr(reader io.Reader) []int64 {
 func timeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
 	log.Printf("%s took %s", name, elapsed)
+}
+
+func reverse(a [][]int) {
+	for left, right := 0, len(a)-1; left < right; left, right = left+1, right-1 {
+		a[left], a[right] = a[right], a[left]
+	}
 }
